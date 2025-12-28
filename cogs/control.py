@@ -365,12 +365,10 @@ class Control(commands.Cog):
                             fail_count = self.increment_invalid_counter(fid, alliance_id, old_nickname)
 
                             if fail_count >= 3:
-                                # Mark for removal after 3 consecutive failures
-                                members_to_remove.append((fid, old_nickname, "Player does not exist (error 40004 - 3x confirmed)"))
-                                check_fail_list.append(f"❌ `{fid}` ({old_nickname}) - Player not found (3x confirmed - Pending removal)")
-                            else:
-                                # Not enough failures yet - just monitor
-                                check_fail_list.append(f"⚠️ `{fid}` ({old_nickname}) - Player not found ({fail_count}/3 - monitoring)")
+                                # Mark for removal after 3 consecutive failures - only report now
+                                members_to_remove.append((fid, old_nickname, "Player does not exist (3x confirmed)"))
+                                check_fail_list.append(f"❌ `{fid}` ({old_nickname}) - Player not found 3x in a row - Pending removal")
+                            # Don't report failures 1 and 2 - silently track them
                         elif self.is_connection_error(error_msg):
                             # Network/connection issue - NOT an invalid member, just a connection issue
                             connection_errors.append(f"⚠️ `{fid}` ({old_nickname}) - Connection issue (will retry next check)")
@@ -487,7 +485,7 @@ class Control(commands.Cog):
             # Update check_fail_list to show blocked status instead of pending
             for i, item in enumerate(check_fail_list):
                 if "Pending removal" in item:
-                    check_fail_list[i] = item.replace("Pending removal", "REMOVAL BLOCKED (Safety)")
+                    check_fail_list[i] = item.replace("Pending removal", "Removal blocked (safety)")
         else:
             # Safe to proceed with removals
             if members_to_remove:
@@ -500,7 +498,7 @@ class Control(commands.Cog):
                     for i, item in enumerate(check_fail_list):
                         if f"`{fid}`" in item and "Pending removal" in item:
                             if removed:
-                                check_fail_list[i] = item.replace("Pending removal", "Auto-removed")
+                                check_fail_list[i] = item.replace("Pending removal", "Removed")
                             else:
                                 check_fail_list[i] = item.replace("Pending removal", "Failed to remove")
                             break
@@ -537,12 +535,12 @@ class Control(commands.Cog):
                 )
 
             if check_fail_list:
-                # Count auto-removed entries
-                auto_removed_count = sum(1 for item in check_fail_list if "Auto-removed" in item)
+                # Count removed entries
+                removed_count = sum(1 for item in check_fail_list if "- Removed" in item)
 
                 footer_text = f"📊 Total Issues: {len(check_fail_list)}"
-                if auto_removed_count > 0:
-                    footer_text += f" | 🗑️ Auto-removed: {auto_removed_count}"
+                if removed_count > 0:
+                    footer_text += f" | 🗑️ Removed: {removed_count}"
 
                 await self.send_embed(
                     channel=channel,
@@ -578,13 +576,13 @@ class Control(commands.Cog):
             total_changes = len(furnace_changes) + len(nickname_changes) + len(kid_changes)
             changes_text = f"🔄 {total_changes} changes detected"
 
-            # Add auto-removed count if any
-            auto_removed_count = sum(1 for item in check_fail_list if 'Auto-removed' in item)
-            if auto_removed_count > 0:
-                changes_text += f"\n🗑️ {auto_removed_count} invalid IDs removed"
+            # Add removed count if any
+            removed_count = sum(1 for item in check_fail_list if '- Removed' in item)
+            if removed_count > 0:
+                changes_text += f"\n🗑️ {removed_count} invalid IDs removed"
 
             # Add check failures count if any
-            check_failure_count = sum(1 for item in check_fail_list if 'Auto-removed' not in item)
+            check_failure_count = sum(1 for item in check_fail_list if '- Removed' not in item)
             if check_failure_count > 0:
                 changes_text += f"\n❌ {check_failure_count} check failures"
 
